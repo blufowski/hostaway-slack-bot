@@ -1,0 +1,169 @@
+{
+  "name": "Hostaway to Slack 2.0",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "0dd5ec68-8bfa-4d8c-bc10-8b41c377cd98",
+      "name": "Every 10 Minutes",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.hostaway.com/v1/reservations",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "50"
+            },
+            {
+              "name": "status",
+              "value": "confirmed"
+            },
+            {
+              "name": "updatedFrom",
+              "value": "={{ new Date(Date.now() - 12 * 60000).toISOString() }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer {{ $env.HOSTAWAY_TOKEN }}\",\n  \"Cache-Control\": \"no-cache\",\n  \"Accept\": \"application/json\"\n}",
+        "options": {}
+      },
+      "id": "da538613-efa6-46ca-b68e-d6cdccfdc809",
+      "name": "Get Reservations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -272,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst events = [];\n\n// Mapping ID → Код объекта и флаг страны\nconst listingCodes = {\n  425057: { code: \"MI203\", flag: \"🇨🇴\" },\n  425058: { code: \"MI403\", flag: \"🇨🇴\" },\n  425059: { code: \"MI303\", flag: \"🇨🇴\" },\n  425600: { code: \"KavaRoom4\", flag: \"🇩🇪\" },\n  425601: { code: \"KavaRoom2\", flag: \"🇩🇪\" },\n  425602: { code: \"KavaRoom1\", flag: \"🇩🇪\" },\n  425603: { code: \"Jölle215\", flag: \"🇩🇪\" },\n  425604: { code: \"D104\", flag: \"🇲🇽\" },\n  425605: { code: \"GF1\", flag: \"🇩🇪\" },\n  425606: { code: \"GF2\", flag: \"🇩🇪\" },\n  425607: { code: \"Paulus_unten\", flag: \"🇩🇪\" },\n  425608: { code: \"GF5\", flag: \"🇩🇪\" },\n  425609: { code: \"D103\", flag: \"🇲🇽\" },\n  425610: { code: \"GF6\", flag: \"🇩🇪\" },\n  425611: { code: \"GF3\", flag: \"🇩🇪\" },\n  425612: { code: \"GF4\", flag: \"🇩🇪\" },\n  425615: { code: \"Paulus_oben\", flag: \"🇩🇪\" },\n  425616: { code: \"XALET C402\", flag: \"🇲🇽\" },\n  425617: { code: \"XALET G 301\", flag: \"🇲🇽\" },\n  425618: { code: \"XALET B306\", flag: \"🇲🇽\" },\n  425619: { code: \"XALET XS 301\", flag: \"🇲🇽\" },\n  425620: { code: \"KavaRoom3\", flag: \"🇩🇪\" },\n  425621: { code: \"XALET G 103\", flag: \"🇲🇽\" },\n  425622: { code: \"D101AB\", flag: \"🇲🇽\" },\n  425623: { code: \"August Unten\", flag: \"🇩🇪\" },\n  425624: { code: \"XALET G 403\", flag: \"🇲🇽\" },\n  431722: { code: \"TU214\", flag: \"🇨🇴\" },\n  431723: { code: \"TU615\", flag: \"🇨🇴\" },\n  431724: { code: \"F202\", flag: \"🇨🇴\" },\n  431725: { code: \"CH202\", flag: \"🇨🇴\" },\n  431726: { code: \"CH103\", flag: \"🇨🇴\" },\n  431728: { code: \"H101\", flag: \"🇨🇴\" },\n  431729: { code: \"TU515\", flag: \"🇨🇴\" },\n  431730: { code: \"H104\", flag: \"🇨🇴\" },\n  431731: { code: \"TU602\", flag: \"🇨🇴\" },\n  431732: { code: \"H102\", flag: \"🇨🇴\" },\n  431733: { code: \"TU613\", flag: \"🇨🇴\" },\n  431734: { code: \"TU715\", flag: \"🇨🇴\" },\n  431735: { code: \"H202\", flag: \"🇨🇴\" },\n  431739: { code: \"Ch201\", flag: \"🇨🇴\" },\n  431742: { code: \"TU315\", flag: \"🇨🇴\" },\n  431747: { code: \"TU712\", flag: \"🇨🇴\" },\n  431748: { code: \"CH102\", flag: \"🇨🇴\" },\n  431749: { code: \"TU717\", flag: \"🇨🇴\" },\n  431750: { code: \"PE204\", flag: \"🇨🇴\" },\n  431752: { code: \"TU702\", flag: \"🇨🇴\" },\n  431753: { code: \"H201\", flag: \"🇨🇴\" },\n  431754: { code: \"QP213\", flag: \"🇨🇴\" },\n  431755: { code: \"QP507\", flag: \"🇨🇴\" },\n  431756: { code: \"F401\", flag: \"🇨🇴\" },\n  432658: { code: \"H105\", flag: \"🇨🇴\" },\n  435014: { code: \"H103\", flag: \"🇨🇴\" },\n  435053: { code: \"Jun108N\", flag: \"🇲🇽\" }\n};\n\nconsole.log('API Response Debug');\nconsole.log('Items received:', items.length);\n\nfor (const item of items) {\n  const data = item.json;\n  \n  console.log('Response status:', data.status);\n  console.log('Has result:', !!data.result);\n  \n  let reservations = [];\n  if (data.status === \"success\" && data.result && Array.isArray(data.result)) {\n    reservations = data.result;\n  }\n  \n  console.log('Reservations found:', reservations.length);\n  \n  for (const reservation of reservations) {\n    const createdDate = new Date(reservation.insertedOn || reservation.createdAt);\n    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);\n    \n    let eventType = 'new';\n    let changeDetails = '';\n    \n    if (createdDate < oneDayAgo) {\n      const criticalChanges = [];\n      \n      if (reservation.status === 'cancelled') {\n        criticalChanges.push('Cancelled');\n      }\n      \n      const checkIn = new Date(reservation.arrivalDate);\n      if (checkIn <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) {\n        criticalChanges.push('Dates modified');\n      }\n      \n      if (reservation.paymentStatus && reservation.paymentStatus !== 'Paid') {\n        criticalChanges.push(`Payment: ${reservation.paymentStatus}`);\n      }\n      \n      if (criticalChanges.length > 0) {\n        eventType = 'updated';\n        changeDetails = ` (${criticalChanges.join(', ')})`;\n      } else {\n        continue;\n      }\n    }\n    \n    const listing = listingCodes[reservation.listingMapId];\n    const listingDisplay = listing ? `${listing.flag} ${listing.code}` : `Property ${reservation.listingMapId}`;\n    \n    const event = {\n      event_type: eventType,\n      change_details: changeDetails,\n      urgency: eventType === 'updated' ? 'high' : 'normal',\n      reservation: {\n        id: reservation.id,\n        listingName: listingDisplay,\n        checkIn: reservation.arrivalDate,\n        checkOut: reservation.departureDate,\n        guests: reservation.numberOfGuests || 1,\n        total: reservation.totalPrice || 0,\n        currency: reservation.currency || 'USD',\n        channel: reservation.channelName || 'Direct',\n        status: reservation.status,\n        guestName: reservation.guestName || 'N/A'\n      }\n    };\n    \n    events.push(event);\n  }\n}\n\nconsole.log('Events Created');\nconsole.log('Total events:', events.length);\n\nreturn events.map(event => ({ json: event }));"
+      },
+      "id": "fc63b506-5ddb-455d-aca7-a40e1cb0de6d",
+      "name": "Process Reservations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.first().json;\nconst reservation = event.reservation;\n\n// Channel colors\nfunction getChannelEmoji(channelName) {\n  const channelEmojis = {\n    'airbnbOfficial': '🔴',\n    'bookingcom': '🔵', \n    'vrbo': '🟡',\n    'direct': '🟢'\n  };\n  return channelEmojis[channelName] || '⚫';\n}\n\n// Format dates\nfunction formatDate(dateStr) {\n  if (!dateStr) return 'N/A';\n  const date = new Date(dateStr);\n  const day = String(date.getDate()).padStart(2, '0');\n  const month = String(date.getMonth() + 1).padStart(2, '0');\n  const year = String(date.getFullYear()).slice(-2);\n  return `${day}/${month}/${year}`;\n}\n\n// Event emojis and titles\nconst eventEmojis = {\n  'new': '🎉',\n  'updated': '📝',\n  'cancelled': '❌'\n};\n\nconst titles = {\n  'new': 'New Booking',\n  'updated': 'Booking Updated', \n  'cancelled': 'Booking Cancelled'\n};\n\nconst channelIcon = getChannelEmoji(reservation.channel);\nconst reservationLink = `https://dashboard.hostaway.com/v3/reservations/${reservation.id}`;\n\n// Регистрация нужна только для TU квартир\nconst needsRegistration = reservation.listingName.includes('TU');\n\n// Create message\nlet message = `${eventEmojis[event.event_type]} ${titles[event.event_type]}${event.change_details || ''} | ${reservation.listingName} | ${reservation.guestName} | 📅 ${formatDate(reservation.checkIn)} → ${formatDate(reservation.checkOut)} | ${reservation.guests} guests | ${reservation.total} ${reservation.currency} | ${channelIcon} ${reservation.channel} | <${reservationLink}|View Reservation>`;\n\nif (needsRegistration) {\n  message += ' ⚠️ Registration required for reception access';\n}\n\nreturn [{\n  json: {\n    text: message\n  }\n}];"
+      },
+      "id": "e4782e2b-dcc7-488c-a99c-7afa477107cc",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c90459bc-aefe-426d-acb8-c0d73700d5a1",
+      "name": "Send to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        336,
+        -240
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 10 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Reservations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Reservations": {
+      "main": [
+        [
+          {
+            "node": "Process Reservations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Reservations": {
+      "main": [
+        [
+          {
+            "node": "Format Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}
